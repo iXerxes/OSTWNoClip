@@ -1,5 +1,3 @@
-import "D:\Jordan\Overwatch\Workshop\OSTW\_Environments\NepalDev.json";
-
 Button NOCLIP_ACCEND_BUTTON: Button.Jump;
 Button NOCLIP_DECCEND_BUTTON: Button.Crouch;
 Button NOCLIP_BOOST_BUTTON: Button.Ability1;
@@ -69,14 +67,6 @@ void SetNoClipAccess(in Player player, in Boolean hasAccess) { player.NoClip.Has
 # 
 # - `player`: The player to toggle the NoClip state of.
 void ToggleNoClip(in Player player) { player.NoClip.ToggleFlag = true; }
-
-rule: "" -10
-Event.OngoingPlayer
-{
-    define A = IsUsingNoClip(AllPlayers(Team.All)[0]);
-    A = IsUsingNoClip(EventPlayer());
-}
-
 
 single struct NoClipSettingStore {
 
