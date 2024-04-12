@@ -1,0 +1,269 @@
+import "D:\Jordan\Overwatch\Workshop\OSTW\_Environments\NepalDev.json";
+
+Button NOCLIP_ACCEND_BUTTON: Button.Jump;
+Button NOCLIP_DECCEND_BUTTON: Button.Crouch;
+Button NOCLIP_BOOST_BUTTON: Button.Ability1;
+
+Button[] ButtonArray(): [
+    Button.PrimaryFire,
+    Button.SecondaryFire,
+    Button.Ability1,
+    Button.Ability2,
+    Button.Ultimate,
+    Button.Interact,
+    Button.Jump,
+    Button.Crouch,
+    Button.Melee,
+    Button.Reload
+];
+
+enum NoClipNameTagVisibilty {
+
+    // Don't create nametags for NoClip users.
+    AlwaysHidden,
+
+    // When a player is using NoClip, their nametag is visible to everyone.
+    AlwaysVisible,
+
+    // Only those who have access to NoClip will see the nametag of a NoClip user.
+    AccesssOnly,
+
+    // Only those who are using NoClip will be able to see the nametag of another NoClip user.
+    EnabledOnly
+}
+
+
+//
+// -- NoClip API --
+//
+
+# Check if the specified player has NoClip access.
+# - Can be used within the player scope with `NoClip.HasAccess`.
+# 
+# - `player`: The player to check.
+Boolean HasNoClipAccess(Player player): player.NoClip.HasAccess;
+
+# Check if the specified player is currently using NoClip.
+# - Can be used within the player scope with `NoClip.IsEnabled`.
+# 
+# - `player`: The player to check.
+Boolean IsUsingNoClip(Player player): player.NoClip._IsEnabled;
+
+# Get the position of the specified player's NoClip camera.
+# - Can be used within the player scope with `_NoClipCamPos`.
+# 
+# - `player`: The player to get the NoClip position of.
+Vector NoClipPosition(Player player): player._NoClipCamPos;
+
+# Set whether or not the specified player has access to use NoClip.
+# - Can be used within the player scope with `NoClip.HasAccess = true/false`.
+# - If the player is currently using NoClip and access is revoked, NoClip will automatically be toggled off for that player.
+# 
+# - `player`: The player to set access for.
+# - `hasAccess`: Whether or not the player has access.
+void SetNoClipAccess(in Player player, in Boolean hasAccess) { player.NoClip.HasAccess = hasAccess; }
+
+# Toggle the current NoClip state for a player. This is basically just pressing the toggle button *for* the player.
+# - Can be used within the player scope with `NoClip.ToggleFlag = true`.
+# - If the player doesn't have access to NoClip, their NoClip state will automatically be toggled off, once toggled on.
+# 
+# - `player`: The player to toggle the NoClip state of.
+void ToggleNoClip(in Player player) { player.NoClip.ToggleFlag = true; }
+
+rule: "" -10
+Event.OngoingPlayer
+{
+    define A = IsUsingNoClip(AllPlayers(Team.All)[0]);
+    A = IsUsingNoClip(EventPlayer());
+}
+
+
+single struct NoClipSettingStore {
+
+    # Whether or not everyone has access to NoClip by default.
+    public Boolean AllowAccessByDefault;
+
+    # The nametag visibility of NoClip users.
+    public NoClipNameTagVisibilty NameTagVisibility;
+
+    # The button used to enter/exit NoClip mode.
+    public Button ToggleButton;
+
+    # The normal movement speed of the NoClip camera.
+    public Number BaseSpeed;
+
+    # The speed of the NoClip camera when using the boost button.
+    public Number BoostSpeed;
+    public Number CameraSmoothing;
+}
+
+public globalvar NoClipSettingStore NoClipSettings;
+
+single struct NoClipPlayerFlagStore {
+
+    # Whether or not the player has access to use NoClip.
+    public Boolean HasAccess;
+
+    # READONLY: Whether or not NoClip is currently in use.
+    public Boolean _IsEnabled;
+
+    # A flag used to toggle the current NoClip state.
+    public Boolean ToggleFlag;
+
+    # READONLY: Used to orient the player facing direction when going in/out of NoClip mode.
+    public Vector _LastFacingDirection;
+
+    # READONLY: The text ID of the player's nametag.
+    public Number _NameTagHandle;
+
+    # READONLY: Used to determine if Invincibility should be removed when exiting NoClip mode.
+    public Number _LastInvincibilityState;
+
+
+}
+
+# The player's NoClip flags & settings.
+public playervar NoClipPlayerFlagStore NoClip;
+
+# READONLY: The current position of the player's NoClip camera.
+public playervar Vector _NoClipCamPos;
+
+rule: "{1/4} § NoClip - Xerxes#21917 § Init Global" 1
+{
+    NoClipSettings.AllowAccessByDefault = WorkshopSettingToggle("NoClip Settings", "Grant Global Access By Default (Default = True)", true, 0);
+
+    NoClipSettings.NameTagVisibility = WorkshopSettingCombo("NoClip Settings", "Player Position Tag Visibility (Default = Visible to all)", 1, [
+        "NoClip user positions are hidden from everyone.",
+        "Everyone can see the position of a NoClip user.",
+        "Only those with NoClip access can see other NoClip users.",
+        "Only active NoClip users can see the positions of other active NoClip users."
+    ], 1);
+
+    NoClipSettings.ToggleButton = ButtonArray()[WorkshopSettingCombo("NoClip Settings", "NoClip Toggle Button (Default = Ultimate)", 4, [
+        "Primary Fire",
+        "Secondary Fire",
+        "Ability 1 (Warning - Conflicts with boost control.)",
+        "Ability 2",
+        "Ultimate",
+        "Interact",
+        "Jump (Warning - Conflicts with accend control.)",
+        "Crouch (Warning - Conflicts with decend control.)",
+        "Melee",
+        "Reload"
+    ], 2)];
+
+    NoClipSettings.BaseSpeed = WorkshopSettingInteger("NoClip Settings", "NoClip Base Speed (Default = 10)", 10, 1, 1000, 3);
+    NoClipSettings.BoostSpeed = WorkshopSettingInteger("NoClip Settings", "NoClip Boost Speed (Default = 20)", 20, 1, 100, 4);
+    NoClipSettings.CameraSmoothing = WorkshopSettingInteger("NoClip Settings", "NoClip Camera Smoothing - Recommended between 10-60 (Default = 25)", 25, 0, 100, 5);
+
+}
+
+rule: "{2/4} § NoClip - Xerxes#21917 § Init Player" 2
+Event.OngoingPlayer
+{
+    NoClip.HasAccess = NoClipSettings.AllowAccessByDefault;
+    NoClip._IsEnabled = false;
+    NoClip.ToggleFlag = false;
+}
+
+rule: "{3/4} § NoClip - Xerxes#21917 § Player Activation (Default = Q/Ultimate)" 3
+Event.OngoingPlayer
+if (NoClip.HasAccess)
+if (IsButtonHeld(EventPlayer(), NoClipSettings.ToggleButton))
+{
+    // Set the flag to toggle the current NoClip state.
+    NoClip.ToggleFlag = true;
+}
+
+rule: "{4/4} § NoClip - Xerxes#21917 § Toggle Controller" 4
+Event.OngoingPlayer
+if (NoClip.ToggleFlag || (!NoClip.HasAccess && NoClip._IsEnabled)) // ToggleFlag is true, or NoClip is enabled with no access.
+{
+    // Toggle the current enabled status.
+    NoClip._IsEnabled = !NoClip._IsEnabled ;
+
+    if (NoClip._IsEnabled) {
+
+        // NoClip nametags are always visible.
+        if (NoClipSettings.NameTagVisibility == NoClipNameTagVisibilty.AlwaysVisible) {
+            CreateInWorldText(RemoveFromArray(AllPlayers(Team.All), EventPlayer()),
+                <"<0> <1>",
+                    HeroIconString(HeroOf(EventPlayer())),
+                    EventPlayer()
+                >,
+                _NoClipCamPos, 1, Clipping.DoNotClip, InworldTextRev.VisibleToPositionAndString, Color.White, Spectators.DefaultVisibility);
+
+        // Only those with NoClip access can see the nametag of a NoClip user.
+        } else if (NoClipSettings.NameTagVisibility == NoClipNameTagVisibilty.AccesssOnly) {
+            CreateInWorldText(RemoveFromArray(FilteredArray(AllPlayers(Team.All), ArrayElement().NoClip.HasAccess), EventPlayer()),
+                <"<0> <1>",
+                    HeroIconString(HeroOf(EventPlayer())),
+                    EventPlayer()
+                >, _NoClipCamPos, 1, Clipping.DoNotClip, InworldTextRev.VisibleToPositionAndString, Color.White, Spectators.DefaultVisibility);
+            
+        // Only those that are currently using NoClip can see the nametags of other NoClip users.
+        } else if (NoClipSettings.NameTagVisibility == NoClipNameTagVisibilty.EnabledOnly) {
+            CreateInWorldText(RemoveFromArray(FilteredArray(AllPlayers(Team.All), ArrayElement().NoClip._IsEnabled), EventPlayer()),
+                <"<0> <1>",
+                    HeroIconString(HeroOf(EventPlayer())),
+                    EventPlayer()
+                >, _NoClipCamPos, 1, Clipping.DoNotClip, InworldTextRev.VisibleToPositionAndString, Color.White, Spectators.DefaultVisibility);
+        }
+
+        // Set the nametag handle, or skip if nametags are disabled.
+        SkipIf((NoClipSettings.NameTagVisibility == NoClipNameTagVisibilty.AlwaysHidden), 1);
+        NoClip._NameTagHandle = LastTextID();
+
+        _NoClipCamPos = EyePosition(EventPlayer());
+        ChaseVariableAtRate(_NoClipCamPos, _NoClipCamPos + FacingDirectionOf(EventPlayer()) * 1000 * ZOf(ThrottleOf(EventPlayer())) + (WorldVectorOf(Left(), EventPlayer(), LocalVector.Rotation) * XOf(ThrottleOf(EventPlayer())) + Vector(0, IsButtonHeld(EventPlayer(), NOCLIP_ACCEND_BUTTON) * 1 + IsButtonHeld(EventPlayer(), NOCLIP_DECCEND_BUTTON) * -1, 0)) * 1000, NoClipSettings.BaseSpeed * (IsButtonHeld(EventPlayer(), NOCLIP_BOOST_BUTTON) == false) + NoClipSettings.BoostSpeed * (IsButtonHeld(EventPlayer(), NOCLIP_BOOST_BUTTON)), RateChaseReevaluation.DestinationAndRate);
+
+        // The wait helps to reduce the intense flash/flicker when entering NoClip.
+        Wait(0.025, WaitBehavior.IgnoreCondition);
+        StartCamera(EventPlayer(), _NoClipCamPos, _NoClipCamPos + FacingDirectionOf(EventPlayer()), NoClipSettings.CameraSmoothing);
+
+        NoClip._LastFacingDirection = FacingDirectionOf(EventPlayer());
+        Teleport(EventPlayer(), Vector(IndexOfArrayValue(AllPlayers(Team.All), EventPlayer()) * 25, 500, 0));
+        StartForcingPlayerPosition(EventPlayer(), Vector(IndexOfArrayValue(AllPlayers(Team.All), EventPlayer()) * 25, 500, 0), false);
+        SetFacing(EventPlayer(), NoClip._LastFacingDirection, Relative.ToWorld);
+
+        DisallowButton(EventPlayer(), Button.PrimaryFire);
+        DisallowButton(EventPlayer(), Button.SecondaryFire);
+        DisallowButton(EventPlayer(), Button.Ability1);
+        DisallowButton(EventPlayer(), Button.Ability2);
+        DisallowButton(EventPlayer(), Button.Ultimate);
+        DisallowButton(EventPlayer(), Button.Interact);
+        DisallowButton(EventPlayer(), Button.Jump);
+        DisallowButton(EventPlayer(), Button.Crouch);
+
+        NoClip._LastInvincibilityState = HasStatus(EventPlayer(), Status.Invincible);
+        SetStatus(EventPlayer(), null, Status.Invincible, 9999);
+
+    } else {
+
+        StopChasingVariable(_NoClipCamPos);
+        StopForcingPlayerPosition(EventPlayer());
+        NoClip._LastFacingDirection = FacingDirectionOf(EventPlayer());
+        Teleport(EventPlayer(), _NoClipCamPos - (EyePosition(EventPlayer()) - PositionOf(EventPlayer())));
+        DestroyInWorldText(NoClip._NameTagHandle);
+
+        SetFacing(EventPlayer(), NoClip._LastFacingDirection, Relative.ToWorld);
+        AllowButton(EventPlayer(), Button.PrimaryFire);
+        AllowButton(EventPlayer(), Button.SecondaryFire);
+        AllowButton(EventPlayer(), Button.Ability1);
+        AllowButton(EventPlayer(), Button.Ability2);
+        AllowButton(EventPlayer(), Button.Ultimate);
+        AllowButton(EventPlayer(), Button.Interact);
+        AllowButton(EventPlayer(), Button.Jump);
+        AllowButton(EventPlayer(), Button.Crouch);
+
+        SkipIf(NoClip._LastInvincibilityState, 1);
+        ClearStatus(EventPlayer(), Status.Invincible);
+
+        StopForcingPlayerPosition(EventPlayer());
+        StopCamera(EventPlayer());
+
+    }
+
+    NoClip.ToggleFlag = false;
+
+}
