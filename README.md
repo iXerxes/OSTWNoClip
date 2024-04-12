@@ -1,4 +1,4 @@
-# OSTW NoClip
+# OSTW NoClip Module
 ## An advanced, but relatively light-weight NoClip module for the Overwatch Workshop.
 
 ### What is it?
@@ -10,6 +10,18 @@ NoClip allows you to start and stop flying on command, but also without the rest
 This script is designed to be a module and aims to be a lightweight package so that it can fit into any project with as few side affects and disruptions as possible.
 
 > If you're just wanting a way to view the map without including it in your project, the script can work fully standalone, so you're welcome to try it out that way too :)
+
+___
+
+### Features
+- Allow/disallow specific players to use NoClip.
+- Show name tags of the positions of players using NoClip
+- Very easy to set/change the activation method. (Keybind)
+- Fly in the direction your're facing, and pass through walls into out-of-bounds areas.
+- As you'd expect, you go back to regular form once you exit NoClip, continuing from that position.
+- Seamlessly switch in and out of NoClip from your current position.
+- Allows you to change the global properties such as permissions, name-tag visibility, default speed, boost speed and camera smoothing.
+- **Easy to configure** - Everything is configurable using the Workshop settings menu.
 
 ___
 
@@ -54,18 +66,6 @@ A few macros have been created to make it a little easier to interact with as an
   - `player`: The player to toggle the NoClip state of.
 
   Example: `ToggleNoClip(EventPlayer()));`
-
-___
-
-### Features
-- Allow/disallow specific players to use NoClip.
-- Show name tags of the positions of players using NoClip
-- Very easy to set/change the activation method. (Keybind)
-- Fly in the direction your're facing, and pass through walls into out-of-bounds areas.
-- As you'd expect, you go back to regular form once you exit NoClip, continuing from that position.
-- Seamlessly switch in and out of NoClip from your current position.
-- Allows you to change the global properties such as permissions, name-tag visibility, default speed, boost speed and camera smoothing.
-- **Easy to configure** - Everything is configurable using the Workshop settings menu.
 
 ___
 
